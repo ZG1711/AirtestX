@@ -25,8 +25,12 @@ class CAP_METHOD(object):
     MINICAP = "MINICAP"
     WDACAP = "WDACAP"
     MJPEG = "MJPEG"
-
-
+# 是否使用mjpegserver
+MJPEG_SERVER = True
+# 保留的质量50-100
+MJPEG_SERVER_SCREENSHOT_QUALITY = 80
+# 帧率,不建议太高
+MJPEG_SERVER_FRAMERATE = 10
 # wda default mjpeg server port number
 DEFAULT_MJPEG_PORT = 9100
 

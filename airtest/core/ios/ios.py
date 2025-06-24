@@ -4,7 +4,10 @@
 import os
 import re
 import sys
-
+from threading import Thread
+import requests
+import cv2
+import numpy as np
 import requests.exceptions
 import wda
 import time
@@ -24,7 +27,7 @@ from tidevice.exceptions import MuxError
 from airtest import aircv
 from airtest.core.device import Device
 from airtest.core.ios.constant import CAP_METHOD, TOUCH_METHOD, IME_METHOD, ROTATION_MODE, KEY_EVENTS, \
-    LANDSCAPE_PAD_RESOLUTION, IP_PATTERN
+    LANDSCAPE_PAD_RESOLUTION, IP_PATTERN,MJPEG_SERVER,DEFAULT_MJPEG_PORT,MJPEG_SERVER_SCREENSHOT_QUALITY,MJPEG_SERVER_FRAMERATE
 from airtest.core.ios.rotation import XYTransformer, RotationWatcher
 from airtest.core.ios.instruct_cmd import InstructHelper
 from airtest.utils.logger import get_logger
@@ -658,8 +661,17 @@ class IOS(Device):
         self._using_ios_tagent = None
         self._device_info = {}
         self.instruct_helper = InstructHelper(self.device_info['uuid'])
-        self.mjpegcap = MJpegcap(self.instruct_helper, ori_function=lambda: self.display_info,
+        self.current_frame = None # 当前帧
+        # 使用默认airtest的mjpeg截图方式
+        if not MJPEG_SERVER:
+            self.mjpegcap = MJpegcap(self.instruct_helper, ori_function=lambda: self.display_info,
                                  ip=self.ip, port=mjpeg_port)
+        else:
+            self.session = requests.Session()
+            # 更新传输时的mjpeg传输质量和帧率,仅需设置一次
+            self.update_mjpeg_settings()
+            Thread(target=self.mjpeg_thread).start()
+
         # Start up RotationWatcher with default session.
         self.rotation_watcher = RotationWatcher(self)
         self._register_rotation_watcher()
@@ -671,7 +683,57 @@ class IOS(Device):
 
         # Since uuid and udid are very similar, both names are allowed.
         self._udid = udid or name or serialno
-
+        
+    def mjpeg_thread(self):
+        try:
+            self.stream_url = f"http://{self.ip}:{DEFAULT_MJPEG_PORT}"
+            # 初始化MJPEG流
+            response = self.session.get(self.stream_url, stream=True, timeout=5)
+            response.raise_for_status()
+            
+            # 使用BytesIO处理流数据
+            stream_bytes = bytes()
+            
+            while True:
+                # 从流中读取数据
+                chunk = response.raw.read(1024)
+                if not chunk:
+                    break
+                
+                stream_bytes += chunk
+                a = stream_bytes.find(b'\xff\xd8')  # JPEG起始标记
+                b = stream_bytes.find(b'\xff\xd9')  # JPEG结束标记
+                
+                # 如果检测到完整的JPEG帧
+                if a != -1 and b != -1:
+                    jpeg_data = stream_bytes[a:b+2]
+                    stream_bytes = stream_bytes[b+2:]
+                    
+                    # 将JPEG数据转换为numpy数组
+                    try:
+                        frame = cv2.imdecode(np.frombuffer(jpeg_data, dtype=np.uint8), cv2.IMREAD_COLOR)
+                        if frame is not None:
+                            self.current_frame = frame
+                    except Exception as e:
+                        print(f"帧处理错误: {e}")
+        
+        except requests.exceptions.RequestException as e:
+            print(f"无法连接到MJPEG流: {e}")
+        finally:
+            if self.session:
+                self.session.close()
+    def update_mjpeg_settings(self):
+        """通过Appium设置接口更新MJPEG参数"""
+        try:
+            # 构建设置参数
+            settings = {
+                "mjpegServerScreenshotQuality": MJPEG_SERVER_SCREENSHOT_QUALITY,
+                "mjpegServerFramerate": MJPEG_SERVER_FRAMERATE
+            }
+            self.driver._session_http.post("/appium/settings",data={"settings":settings})
+            return True
+        except Exception as e:
+            return 
     def _get_default_device(self):
         """Get local default device when no udid.
 
@@ -963,6 +1025,9 @@ class IOS(Device):
         Returns:
             Screen snapshot's cv2 object.
         """
+        # 使用缓存帧,这样会比常规的截图快很多
+        if MJPEG_SERVER:
+            return self.current_frame
         data = self._neo_wda_screenshot()
         # Output cv2 object.
         try:
