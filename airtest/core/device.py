@@ -34,7 +34,7 @@ class Device(with_metaclass(MetaDevice, object)):
         Returns: 
             Bool，表示是否找到颜色并点击成功
         """
-        pos = self.find_multi_color(x1, y1, x2, y2, colorOne, colorOffsets, threshold)
+        pos = self.find_multi_colors(x1, y1, x2, y2, colorOne, colorOffsets, threshold)
         if pos:
             self.touch(pos)
             return True
