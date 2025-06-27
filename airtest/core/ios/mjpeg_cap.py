@@ -5,7 +5,7 @@ import socket
 import traceback
 from airtest import aircv
 from airtest.utils.snippet import reg_cleanup, on_method_ready, ready_method
-from airtest.core.ios.constant import ROTATION_MODE, DEFAULT_MJPEG_PORT
+from airtest.core.ios.constant import ROTATION_MODE, MJpeg_Settings
 from airtest.utils.logger import get_logger
 from airtest.utils.safesocket import SafeSocket
 
@@ -49,10 +49,10 @@ class MJpegcap(object):
 
     def __init__(self, instruct_helper=None, ip='localhost', port=None, ori_function=None):
         self.instruct_helper = instruct_helper
-        self.port = int(port or DEFAULT_MJPEG_PORT)
+        self.port = int(port or MJpeg_Settings.DEFAULT_MJPEG_PORT)
         self.ip = ip
         # 如果指定了port，说明已经将wda的9100端口映射到了新端口，无需本地重复映射
-        self.port_forwarding = True if self.port == DEFAULT_MJPEG_PORT and ip in ('localhost', '127.0.0.1') else False
+        self.port_forwarding = True if self.port == MJpeg_Settings.DEFAULT_MJPEG_PORT and ip in ('localhost', '127.0.0.1') else False
         self.ori_function = ori_function
         self.sock = None
         self.buf = None

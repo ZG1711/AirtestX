@@ -27,7 +27,7 @@ from tidevice.exceptions import MuxError
 from airtest import aircv
 from airtest.core.device import Device
 from airtest.core.ios.constant import CAP_METHOD, TOUCH_METHOD, IME_METHOD, ROTATION_MODE, KEY_EVENTS, \
-    LANDSCAPE_PAD_RESOLUTION, IP_PATTERN,MJPEG_SERVER,DEFAULT_MJPEG_PORT,MJPEG_SERVER_SCREENSHOT_QUALITY,MJPEG_SERVER_FRAMERATE
+    LANDSCAPE_PAD_RESOLUTION, IP_PATTERN,MJpeg_Settings
 from airtest.core.ios.rotation import XYTransformer, RotationWatcher
 from airtest.core.ios.instruct_cmd import InstructHelper
 from airtest.utils.logger import get_logger
@@ -36,7 +36,6 @@ from airtest.core.settings import Settings as ST
 from airtest.aircv.screen_recorder import ScreenRecorder, resize_by_max, get_max_size
 from airtest.core.error import LocalDeviceError, AirtestError
 from airtest.core.helper import logwrap
-
 LOGGING = get_logger(__name__)
 
 DEFAULT_ADDR = "http://localhost:8100/"
@@ -663,7 +662,7 @@ class IOS(Device):
         self.instruct_helper = InstructHelper(self.device_info['uuid'])
         self.current_frame = None # 当前帧
         # 使用默认airtest的mjpeg截图方式
-        if not MJPEG_SERVER:
+        if not MJpeg_Settings.MJPEG_SERVER:
             self.mjpegcap = MJpegcap(self.instruct_helper, ori_function=lambda: self.display_info,
                                  ip=self.ip, port=mjpeg_port)
         else:
@@ -688,7 +687,7 @@ class IOS(Device):
         
     def mjpeg_thread(self):
         try:
-            self.stream_url = f"http://{self.ip}:{DEFAULT_MJPEG_PORT}"
+            self.stream_url = f"http://{self.ip}:{MJpeg_Settings.DEFAULT_MJPEG_PORT}"
             # 初始化MJPEG流
             response = self.session.get(self.stream_url, stream=True, timeout=5)
             response.raise_for_status()
@@ -729,8 +728,8 @@ class IOS(Device):
         try:
             # 构建设置参数
             settings = {
-                "mjpegServerScreenshotQuality": MJPEG_SERVER_SCREENSHOT_QUALITY,
-                "mjpegServerFramerate": MJPEG_SERVER_FRAMERATE
+                "mjpegServerScreenshotQuality": MJpeg_Settings.MJPEG_SERVER_SCREENSHOT_QUALITY,
+                "mjpegServerFramerate": MJpeg_Settings.MJPEG_SERVER_FRAMERATE
             }
             self.driver._session_http.post("/appium/settings",data={"settings":settings})
             return True
@@ -1028,7 +1027,7 @@ class IOS(Device):
             Screen snapshot's cv2 object.
         """
         # 使用缓存帧,这样会比常规的截图快很多
-        if MJPEG_SERVER:
+        if MJpeg_Settings.MJPEG_SERVER:
             return self.current_frame
         data = self._neo_wda_screenshot()
         # Output cv2 object.
@@ -1629,7 +1628,7 @@ class IOS(Device):
     def disconnect(self):
         """Disconnected mjpeg and rotation_watcher.
         """
-        if MJPEG_SERVER:
+        if MJpeg_Settings.MJPEG_SERVER:
             self.mjpeg_server_flag = False
         else:
             if self.cap_method == CAP_METHOD.MJPEG:
