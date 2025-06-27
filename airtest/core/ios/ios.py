@@ -670,7 +670,9 @@ class IOS(Device):
             self.session = requests.Session()
             # 更新传输时的mjpeg传输质量和帧率,仅需设置一次
             self.update_mjpeg_settings()
-            Thread(target=self.mjpeg_thread).start()
+            self.mjpeg_server_flag = True
+            self.mjpeg_server = Thread(target=self.mjpeg_thread)
+            self.mjpeg_server.start()
 
         # Start up RotationWatcher with default session.
         self.rotation_watcher = RotationWatcher(self)
@@ -694,7 +696,7 @@ class IOS(Device):
             # 使用BytesIO处理流数据
             stream_bytes = bytes()
             
-            while True:
+            while self.mjpeg_server_flag:
                 # 从流中读取数据
                 chunk = response.raw.read(1024)
                 if not chunk:
@@ -1627,8 +1629,11 @@ class IOS(Device):
     def disconnect(self):
         """Disconnected mjpeg and rotation_watcher.
         """
-        if self.cap_method == CAP_METHOD.MJPEG:
-            self.mjpegcap.teardown_stream()
+        if MJPEG_SERVER:
+            self.mjpeg_server_flag = False
+        else:
+            if self.cap_method == CAP_METHOD.MJPEG:
+                self.mjpegcap.teardown_stream()
         if self.rotation_watcher:
             self.rotation_watcher.teardown()
 
