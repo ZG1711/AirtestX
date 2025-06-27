@@ -686,43 +686,40 @@ class IOS(Device):
         self._udid = udid or name or serialno
         
     def mjpeg_thread(self):
-        try:
-            self.stream_url = f"http://{self.ip}:{MJpeg_Settings.DEFAULT_MJPEG_PORT}"
-            # 初始化MJPEG流
-            response = self.session.get(self.stream_url, stream=True, timeout=5)
-            response.raise_for_status()
-            
-            # 使用BytesIO处理流数据
-            stream_bytes = bytes()
-            
-            while self.mjpeg_server_flag:
-                # 从流中读取数据
-                chunk = response.raw.read(1024)
-                if not chunk:
-                    break
-                
-                stream_bytes += chunk
-                a = stream_bytes.find(b'\xff\xd8')  # JPEG起始标记
-                b = stream_bytes.find(b'\xff\xd9')  # JPEG结束标记
-                
-                # 如果检测到完整的JPEG帧
-                if a != -1 and b != -1:
-                    jpeg_data = stream_bytes[a:b+2]
-                    stream_bytes = stream_bytes[b+2:]
-                    
-                    # 将JPEG数据转换为numpy数组
-                    try:
-                        frame = cv2.imdecode(np.frombuffer(jpeg_data, dtype=np.uint8), cv2.IMREAD_COLOR)
-                        if frame is not None:
-                            self.current_frame = frame
-                    except Exception as e:
-                        print(f"帧处理错误: {e}")
+        # 设置MJPEG流URL
+        self.stream_url = f"http://{self.ip}:{MJpeg_Settings.DEFAULT_MJPEG_PORT}"
         
-        except requests.exceptions.RequestException as e:
-            print(f"无法连接到MJPEG流: {e}")
-        finally:
-            if self.session:
-                self.session.close()
+        cv2.setNumThreads(1)
+        
+        try: 
+            cap = cv2.VideoCapture(self.stream_url)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                
+            # 设置帧率（可选）
+            cap.set(cv2.CAP_PROP_FPS, MJpeg_Settings.MJPEG_SERVER_FRAMERATE)
+                
+                # 记录最后成功获取帧的时间
+            last_frame_time = time.time()
+                
+            while self.mjpeg_server_flag:
+                    # 读取一帧
+                ret, frame = cap.read()
+                    
+                if ret:
+                    # 更新当前帧
+                    self.current_frame = frame
+                    last_frame_time = time.time()
+                else:
+                    # 检查是否超时（超过5秒没有新帧）
+                    if time.time() - last_frame_time > 5:
+                        break
+                    # 短暂等待后重试
+                    time.sleep(0.1)
+                    # 关闭当前连接
+            cap.release()
+        except Exception as e:
+            raise e
+            
     def update_mjpeg_settings(self):
         """通过Appium设置接口更新MJPEG参数"""
         try:
