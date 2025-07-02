@@ -28,7 +28,7 @@ class CAP_METHOD(object):
 
 class MJpeg_Settings(object):
     # 是否启动mjpeg服务
-    MJPEG_SERVER = True
+    MJPEG_SERVER = False
 
     # 截图质量50-100
     MJPEG_SERVER_SCREENSHOT_QUALITY = 80
