@@ -143,12 +143,11 @@ class Device(with_metaclass(MetaDevice, object)):
         
         # 获取屏幕截图
         screen = self.snapshot()
-        screen_cv = cv2.cvtColor(np.array(screen), cv2.COLOR_RGB2BGR)
         
         # 在主颜色范围内查找第一个点
         lower = np.array(main_color_range[0], dtype=np.uint8)
         upper = np.array(main_color_range[1], dtype=np.uint8)
-        mask = cv2.inRange(screen_cv, lower, upper)
+        mask = cv2.inRange(screen, lower, upper)
         
         # 在指定区域内查找
         mask_region = mask[y1:y2, x1:x2]
@@ -193,10 +192,10 @@ class Device(with_metaclass(MetaDevice, object)):
                 check_y = global_y + group['dy']
                 
                 if (check_x < 0 or check_y < 0 or 
-                    check_x >= screen_cv.shape[1] or check_y >= screen_cv.shape[0]):
+                    check_x >= screen.shape[1] or check_y >= screen.shape[0]):
                     continue  # 超出屏幕范围不计入匹配
                     
-                pixel_color = screen_cv[check_y, check_x]
+                pixel_color = screen[check_y, check_x]
                 lower = np.array(group['range'][0], dtype=np.uint8)
                 upper = np.array(group['range'][1], dtype=np.uint8)
                 
